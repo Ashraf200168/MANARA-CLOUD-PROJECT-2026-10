@@ -37,7 +37,10 @@ function Invoke-Git {
   $exitCode = $LASTEXITCODE
   $ErrorActionPreference = $savedPreference
   if ($output) { $output | ForEach-Object { Write-Host ([string]$_) } }
-  if ($exitCode -ne 0) { throw "git $($GitArgs -join ' ') failed with exit code $exitCode" }
+  if ($exitCode -ne 0) {
+    $details = ($output | ForEach-Object { [string]$_ }) -join "`n"
+    throw "git $($GitArgs -join ' ') failed with exit code $exitCode`n$details"
+  }
   return @($output)
 }
 
