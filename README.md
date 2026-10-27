@@ -81,6 +81,7 @@ flutter build apk --release --target-platform android-arm64
 - [تطبيق الهاتف](docs/MOBILE-APP.md)
 - [النسخ الاحتياطي والاستعادة](docs/BACKUP-AND-RECOVERY.md)
 - [التشغيل الذاتي والمراقبة](docs/OPERATIONS.md)
+- [التقرير الكامل للمشروع من البداية حتى الحالة الحالية](docs/MANARA-COMPLETE-PROJECT-REPORT.md)
 - [تاريخ المشروع والإصدارات](docs/PROJECT-HISTORY.md)
 - [سياسة الأمان](SECURITY.md)
 
