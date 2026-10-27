@@ -1,12 +1,13 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory = $true)]
-  [string]$BackupPath
+  [string]$BackupPath,
+
+  [string]$RemoteUrl = 'https://github.com/Ashraf200168/MANARA-CLOUD-PROJECT-2026-10.git'
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = [IO.Path]::GetFullPath($PSScriptRoot)
-$remoteUrl = 'https://github.com/Ashraf200168/MANARA-CLOUD-PROJECT-2026-10.git'
 $branch = 'encrypted-backup'
 $toolRoot = Join-Path $projectRoot '.tools\github-backup-publish'
 $logPath = Join-Path $toolRoot 'publish.log'
@@ -45,7 +46,7 @@ try {
 
   & git -C $workRoot init -b $branch | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'Could not initialise the backup publishing workspace.' }
-  & git -C $workRoot remote add origin $remoteUrl
+  & git -C $workRoot remote add origin $RemoteUrl
   if ($LASTEXITCODE -ne 0) { throw 'Could not configure the GitHub remote.' }
 
   $savedPreference = $ErrorActionPreference
@@ -55,7 +56,8 @@ try {
   $ErrorActionPreference = $savedPreference
   if ($remoteExit -ne 0) { throw "Could not authenticate to GitHub: $($remoteOutput -join ' ')" }
   $expected = ''
-  if ($remoteOutput) { $expected = (([string]$remoteOutput[0]) -split '\s+')[0] }
+  $remoteLines = @($remoteOutput)
+  if ($remoteLines.Count -gt 0) { $expected = (([string]$remoteLines[0]) -split '\s+')[0] }
 
   $publishedBackup = Join-Path $workRoot 'manara-cloud-latest.mnbak'
   $publishedHash = Join-Path $workRoot 'manara-cloud-latest.mnbak.sha256.txt'
@@ -98,4 +100,3 @@ finally {
     Remove-Item -LiteralPath $workRoot -Recurse -Force -ErrorAction SilentlyContinue
   }
 }
-
