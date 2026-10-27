@@ -99,7 +99,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialise the local Git repository.' }
   }
 
-  $originExists = (& git -C $projectRoot remote) -contains 'origin'
+  $null = & git -C $projectRoot remote get-url origin 2>$null
+  $originExists = ($LASTEXITCODE -eq 0)
   if ($originExists) { Invoke-Git -GitArgs @('remote', 'set-url', 'origin', $remoteUrl) | Out-Null }
   else { Invoke-Git -GitArgs @('remote', 'add', 'origin', $remoteUrl) | Out-Null }
 
