@@ -43,6 +43,10 @@
 | `release/` | آخر APK مع بصمة SHA-256 |
 | `docs/` | معمارية النظام، النشر، التطبيق، والتعافي |
 
+## التشغيل الذاتي
+
+بعد إعداد النسخ المشفر وGitHub، شغّل `START-MANARA-FULL-HANDSOFF.bat` مرة واحدة. بعدها يفحص Windows الموقع والـAPI مرتين يوميًا وعند تسجيل الدخول، ويصلح النسخة المتأخرة، ويرفع المصدر وآخر APK والنسخة المشفرة تلقائيًا. التفاصيل وحدود العمل موثقة في [دليل التشغيل الذاتي](docs/OPERATIONS.md).
+
 ## البداية السريعة للمطور
 
 المتطلبات: Node.js 22.13 أو أحدث، pnpm، Supabase CLI، وFlutter عند بناء تطبيق الهاتف.
@@ -76,6 +80,7 @@ flutter build apk --release --target-platform android-arm64
 - [النشر من الصفر](docs/DEPLOYMENT.md)
 - [تطبيق الهاتف](docs/MOBILE-APP.md)
 - [النسخ الاحتياطي والاستعادة](docs/BACKUP-AND-RECOVERY.md)
+- [التشغيل الذاتي والمراقبة](docs/OPERATIONS.md)
 - [تاريخ المشروع والإصدارات](docs/PROJECT-HISTORY.md)
 - [سياسة الأمان](SECURITY.md)
 
