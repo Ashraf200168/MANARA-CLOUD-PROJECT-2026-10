@@ -33,7 +33,7 @@ function Invoke-Git {
   )
   $savedPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
-  $output = & git -C $projectRoot @GitArgs 2>&1
+  $output = & git -c "safe.directory=$projectRoot" -C $projectRoot @GitArgs 2>&1
   $exitCode = $LASTEXITCODE
   $ErrorActionPreference = $savedPreference
   if ($output) { $output | ForEach-Object { Write-Host ([string]$_) } }
@@ -66,7 +66,7 @@ function Update-ReleaseApk {
 }
 
 function Assert-PublicTreeSafe {
-  $candidateFiles = @(& git -C $projectRoot ls-files --cached --others --exclude-standard)
+  $candidateFiles = @(& git -c "safe.directory=$projectRoot" -C $projectRoot ls-files --cached --others --exclude-standard)
   if ($LASTEXITCODE -ne 0) { throw 'Could not enumerate Git files.' }
   $blockedPath = '(^|/)(imports|outputs|\.tools|node_modules|build|\.dart_tool|\.gradle|\.temp)/|(^|/)(local\.properties$|key\.properties$)|\.(db|sqlite3?|mnbak|jks|keystore|p12|pem|key)$'
   $blocked = @($candidateFiles | Where-Object {
@@ -99,7 +99,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialise the local Git repository.' }
   }
 
-  $null = & git -C $projectRoot remote get-url origin 2>$null
+  $null = & git -c "safe.directory=$projectRoot" -C $projectRoot remote get-url origin 2>$null
   $originExists = ($LASTEXITCODE -eq 0)
   if ($originExists) { Invoke-Git -GitArgs @('remote', 'set-url', 'origin', $remoteUrl) | Out-Null }
   else { Invoke-Git -GitArgs @('remote', 'add', 'origin', $remoteUrl) | Out-Null }
@@ -107,7 +107,7 @@ try {
   Assert-PublicTreeSafe
   Invoke-Git -GitArgs @('add', '-A') | Out-Null
 
-  $staged = @(& git -C $projectRoot diff --cached --name-only)
+  $staged = @(& git -c "safe.directory=$projectRoot" -C $projectRoot diff --cached --name-only)
   if ($LASTEXITCODE -ne 0) { throw 'Could not inspect staged files.' }
   if ($staged.Count -gt 0) {
     $message = 'Update Manara Cloud source, documentation, and Android release'
