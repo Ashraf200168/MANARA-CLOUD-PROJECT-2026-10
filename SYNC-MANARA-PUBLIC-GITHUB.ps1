@@ -19,6 +19,13 @@ function Write-PublishLog([string]$Message) {
   Write-Host $line
 }
 
+function Get-Sha256([string]$Path) {
+  $stream = [IO.File]::OpenRead($Path)
+  $algorithm = [Security.Cryptography.SHA256]::Create()
+  try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '') }
+  finally { $algorithm.Dispose(); $stream.Dispose() }
+}
+
 function Invoke-Git {
   param(
     [Parameter(Mandatory = $true)]
@@ -54,7 +61,7 @@ function Update-ReleaseApk {
     }
   }
   if (-not (Test-Path -LiteralPath $releaseApk)) { throw 'The curated release APK was not found.' }
-  $hash = (Get-FileHash -LiteralPath $releaseApk -Algorithm SHA256).Hash
+  $hash = Get-Sha256 $releaseApk
   Set-Content -LiteralPath $releaseHash -Value "$hash  $([IO.Path]::GetFileName($releaseApk))" -Encoding ASCII
 }
 

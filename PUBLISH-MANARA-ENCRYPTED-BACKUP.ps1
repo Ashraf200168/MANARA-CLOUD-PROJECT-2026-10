@@ -19,6 +19,13 @@ function Write-UploadLog([string]$Message) {
   Write-Host $line
 }
 
+function Get-Sha256([string]$Path) {
+  $stream = [IO.File]::OpenRead($Path)
+  $algorithm = [Security.Cryptography.SHA256]::Create()
+  try { return ([BitConverter]::ToString($algorithm.ComputeHash($stream))).Replace('-', '') }
+  finally { $algorithm.Dispose(); $stream.Dispose() }
+}
+
 function Assert-ChildPath([string]$Path, [string]$Parent) {
   $resolvedPath = [IO.Path]::GetFullPath($Path).TrimEnd('\')
   $resolvedParent = [IO.Path]::GetFullPath($Parent).TrimEnd('\') + '\'
@@ -31,7 +38,7 @@ try {
   $backup = Get-Item -LiteralPath $BackupPath -ErrorAction Stop
   if ($backup.Extension -ne '.mnbak') { throw 'Only an encrypted .mnbak file can be uploaded.' }
   if ($backup.Length -lt 1KB) { throw 'The encrypted backup is unexpectedly small.' }
-  $hash = (Get-FileHash -LiteralPath $backup.FullName -Algorithm SHA256).Hash
+  $hash = Get-Sha256 $backup.FullName
   $hashFile = "$($backup.FullName).sha256.txt"
   if (Test-Path -LiteralPath $hashFile) {
     $recorded = ((Get-Content -LiteralPath $hashFile -Raw).Trim() -split '\s+')[0].ToUpperInvariant()
