@@ -17,5 +17,4 @@ Do not open a public issue containing credentials or personal data. Contact the 
 
 ## Backup isolation
 
-Operational backups contain private educational records. They must be stored only in OneDrive and a dedicated private GitHub repository. A public branch is not a private storage boundary.
-
+Plaintext operational backups must never be committed. With the project owner's explicit approval, automation may publish only the newest authenticated `.mnbak` ciphertext to the `encrypted-backup` branch. The recovery passphrase is never stored in GitHub, and the branch is replaced rather than accumulated. A public branch is not a privacy boundary, so a long unique recovery passphrase remains essential.
