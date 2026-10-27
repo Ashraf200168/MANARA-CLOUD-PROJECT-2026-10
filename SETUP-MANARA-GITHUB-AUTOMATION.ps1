@@ -12,6 +12,13 @@ try {
   Write-Host 'A GitHub browser login may appear once. Complete it with Ashraf200168.' -ForegroundColor Yellow
   Write-Host ''
 
+  Get-Command git -ErrorAction Stop | Out-Null
+  $knownSafeDirectories = @(& git config --global --get-all safe.directory 2>$null)
+  if ($knownSafeDirectories -notcontains $projectRoot) {
+    & git config --global --add safe.directory $projectRoot
+    if ($LASTEXITCODE -ne 0) { throw 'Could not register the Manara project as a trusted Git working directory.' }
+  }
+
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $syncScript
   if ($LASTEXITCODE -ne 0) { throw 'The first public source upload failed. Complete the GitHub sign-in and run this file again.' }
 
@@ -48,4 +55,3 @@ catch {
 finally {
   Read-Host 'Press Enter to close'
 }
-
