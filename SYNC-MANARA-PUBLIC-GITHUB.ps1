@@ -44,6 +44,19 @@ function Invoke-Git {
   return @($output)
 }
 
+function Test-GitSuccess {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string[]]$GitArgs
+  )
+  $savedPreference = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $null = & git -c "safe.directory=$projectRoot" -C $projectRoot @GitArgs 2>&1
+  $exitCode = $LASTEXITCODE
+  $ErrorActionPreference = $savedPreference
+  return ($exitCode -eq 0)
+}
+
 function Update-ReleaseApk {
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   $candidateRoots = @(
@@ -102,8 +115,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Could not initialise the local Git repository.' }
   }
 
-  $null = & git -c "safe.directory=$projectRoot" -C $projectRoot remote get-url origin 2>$null
-  $originExists = ($LASTEXITCODE -eq 0)
+  $originExists = Test-GitSuccess -GitArgs @('remote', 'get-url', 'origin')
   if ($originExists) { Invoke-Git -GitArgs @('remote', 'set-url', 'origin', $remoteUrl) | Out-Null }
   else { Invoke-Git -GitArgs @('remote', 'add', 'origin', $remoteUrl) | Out-Null }
 
@@ -121,15 +133,13 @@ try {
   }
 
   if (-not $NoPush) {
-    $null = & git -c "safe.directory=$projectRoot" -C $projectRoot rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
-    $hasUpstream = ($LASTEXITCODE -eq 0)
+    $hasUpstream = Test-GitSuccess -GitArgs @('rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}')
     if (-not $hasUpstream) {
-      $null = & git -c "safe.directory=$projectRoot" -C $projectRoot ls-remote --exit-code --heads origin main 2>$null
-      $remoteMainExists = ($LASTEXITCODE -eq 0)
+      $remoteMainExists = Test-GitSuccess -GitArgs @('ls-remote', '--exit-code', '--heads', 'origin', 'main')
       if ($remoteMainExists) {
         Invoke-Git -GitArgs @('fetch', 'origin', 'main') | Out-Null
-        $null = & git -c "safe.directory=$projectRoot" -C $projectRoot merge-base --is-ancestor origin/main HEAD 2>$null
-        if ($LASTEXITCODE -ne 0) {
+        $remoteMainIsAncestor = Test-GitSuccess -GitArgs @('merge-base', '--is-ancestor', 'origin/main', 'HEAD')
+        if (-not $remoteMainIsAncestor) {
           Invoke-Git -GitArgs @('merge', '--allow-unrelated-histories', '-X', 'ours', '--no-edit', 'origin/main') | Out-Null
           Write-PublishLog 'Merged the repository initialization already present on GitHub.'
         }
