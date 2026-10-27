@@ -121,6 +121,20 @@ try {
   }
 
   if (-not $NoPush) {
+    $null = & git -c "safe.directory=$projectRoot" -C $projectRoot rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
+    $hasUpstream = ($LASTEXITCODE -eq 0)
+    if (-not $hasUpstream) {
+      $null = & git -c "safe.directory=$projectRoot" -C $projectRoot ls-remote --exit-code --heads origin main 2>$null
+      $remoteMainExists = ($LASTEXITCODE -eq 0)
+      if ($remoteMainExists) {
+        Invoke-Git -GitArgs @('fetch', 'origin', 'main') | Out-Null
+        $null = & git -c "safe.directory=$projectRoot" -C $projectRoot merge-base --is-ancestor origin/main HEAD 2>$null
+        if ($LASTEXITCODE -ne 0) {
+          Invoke-Git -GitArgs @('merge', '--allow-unrelated-histories', '-X', 'ours', '--no-edit', 'origin/main') | Out-Null
+          Write-PublishLog 'Merged the repository initialization already present on GitHub.'
+        }
+      }
+    }
     Invoke-Git -GitArgs @('push', '-u', 'origin', 'main') | Out-Null
     Write-PublishLog 'PUBLIC GITHUB SYNC SUCCESS'
   }
