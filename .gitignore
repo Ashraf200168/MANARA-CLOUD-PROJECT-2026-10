@@ -1,0 +1,55 @@
+node_modules/
+.flutter-state/
+.pub-cache/
+.gradle-home/
+.android-home/
+.android-sdk-local/
+.dart-tool-home/
+.npm-cache/
+.pnpm-store/
+.env
+.env.*
+!.env.example
+cloud-export-*/
+*.log
+.DS_Store
+.wrangler/
+.supabase/
+supabase/.temp/
+
+# Local credentials, backup state, and imported production data.
+.tools/
+imports/
+outputs/
+analytics.settings
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.mnbak
+*.mnbak.sha256.txt
+
+# Build products and machine-specific mobile settings.
+**/build/
+**/.dart_tool/
+**/.gradle/
+**/local.properties
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pem
+**/*.key
+
+# Generated transfer packages and one-off reference renders.
+certificate-reference-package-*/
+certificate-reference-render/
+certificate-reference-*.zip
+Manara-Cloudflare-*.zip
+*.tar.gz
+
+# APKs are excluded everywhere except the curated public release directory.
+*.apk
+!release/
+!release/*.apk
+!release/*.sha256.txt

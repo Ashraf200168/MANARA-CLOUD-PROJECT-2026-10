@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#2d6686">
+  <meta name="description" content="برنامج القراءة الفردية: منصّة علمية أكاديمية لقراءة الكتب الشرعية والاستفادة منها علمًا وعملًا.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="القراءة الفردية">
+  <title>برنامج القراءة الفردية</title>
+  <link rel="icon" type="image/jpeg" href="/assets/reading-program-logo.jpg?v=1.8.4">
+  <link rel="apple-touch-icon" href="/assets/pwa/apple-touch-icon.png?v=1">
+  <link rel="manifest" href="/manifest.webmanifest?v=1">
+  <link rel="stylesheet" href="/styles.css?v=1.8.4">
+  <script src="/cloud-config.js"></script>
+  <script src="/api-client.js"></script>
+  <script defer src="/pwa.js?v=1"></script>
+  <script type="module" src="/app.js?v=cloud-baseline"></script>
+</head>
+<body>
+  <div class="page-pattern" aria-hidden="true"></div>
+  <header class="public-header">
+    <a class="brand" href="#home"><span class="brand-mark"><img src="/assets/reading-program-logo.jpg?v=1.8.4" alt="شعار برنامج القراءة الفردية"></span><span><b id="brandTitle">برنامج القراءة الفردية</b><small id="brandSheikh">د. سارية عبد الجليل فرُّوح</small></span></a>
+    <div class="header-tools">
+      <div class="font-controls" aria-label="حجم الخط"><button type="button" class="font-control" data-font-size="small" title="خط صغير">أ−</button><button type="button" class="font-control" data-font-size="normal" title="خط متوسط">أ</button><button type="button" class="font-control" data-font-size="large" title="خط كبير">أ+</button></div>
+      <button class="menu-button" id="menuButton" aria-label="فتح القائمة" aria-expanded="false">☰</button>
+    </div>
+    <nav id="publicNav"><a href="#home" data-public-route="home">الرئيسية</a><a href="#books" data-public-route="books">المكتبة</a><a href="#lantern" data-public-route="lantern">المسابقات</a><a href="#exam" data-public-route="exam">صفحة الطالب</a><a href="#ask" data-public-route="ask">اسأل الشيخ</a></nav>
+  </header>
+  <main>
+    <section id="home" class="hero public-section public-view active" data-public-view="home">
+      <div class="hero-copy reveal"><span class="eyebrow">قِرَاءَةٌ وَاعِيَةٌ، وَعِلْمٌ يُثْمِرُ عَمَلًا</span><h1 id="welcomeTitle">مرحبًا بكم في برنامج القراءة الفردية</h1><p id="bioText">وهي منصَّة علمية أكاديمية، تُعنى بقراءة الكتب الشرعية قراءة متأنية واعية، والاستفادة منها علمًا وعملًا، واقتناص الفوائد والفرائد، مع الإشراف المباشر، والتوجيه الدقيق لطلبة العلم المشاركين فيها، ضمن منهج علميٍّ أكاديميٍّ يحاكي الطرق العلمية في الجامعات الإسلامية العالمية.</p><div class="hero-actions home-shortcuts"><a class="button gold" href="#exam">صفحتي الطلابية</a><a class="button ghost" href="#books">المكتبة</a><a class="button ghost" href="#lantern">المسابقات</a><a class="button ghost" href="#ask">اسأل الشيخ</a></div></div>
+      <div class="mihrab reveal"><div class="mihrab-inner"><p class="ayah-line"><span aria-hidden="true">﴿</span><b id="rotatingAyah">وَقُلْ رَبِّ زِدْنِي عِلْمًا</b><span aria-hidden="true">﴾</span></p><small id="rotatingAyahSource">طه: ١١٤</small></div></div>
+    </section>
+    <section class="ticker public-view active" data-public-view="home"><span>❧</span><div id="adviceTicker">العلم النافع يرفع صاحبه ويهدي عمله</div><span>❧</span></section>
+    <section id="books" class="public-section content-section public-view" data-public-view="books">
+      <div class="section-heading"><span>المكتبة</span><h2>الكتب الشرعية والمقررات العلمية</h2><p>اقرأ الكتاب المقرَّر قبل الدخول إلى الاختبار.</p></div>
+      <div id="booksGrid" class="card-grid"><div class="empty-card">جارٍ تحميل الكتب…</div></div>
+    </section>
+    <section id="lantern" class="public-section lantern-section public-view" data-public-view="lantern">
+      <div class="section-heading light"><span>المسابقات</span><h2>مسابقات ترسِّخ الفهم</h2><p>اختبارات قصيرة بأسلوب تفاعلي لتثبيت العلم ومراجعة الفوائد.</p></div>
+      <div class="lantern-stage"><div class="lantern-glow">☾</div><div><h3>استعدَّ، وفكِّر، ثم اختر</h3><p>مسابقات عامة للتعلّم والمراجعة بلا تسجيل. أمّا امتحانات البرنامج فتظهر داخل الصفحة الخاصة بكل طالب بعد موافقة الشيخ.</p><div id="publicQuizList" class="stack"></div><a class="button gold" href="#exam">فتح صفحتي الطلابية</a></div></div>
+      <div id="publicQuizWorkspace" class="panel quiz-public hidden"></div>
+    </section>
+    <section id="exam" class="public-section content-section public-view" data-public-view="exam">
+      <div class="section-heading"><span>بوابة الطالب</span><h2>صفحة واحدة ترافقك في جميع الامتحانات</h2><p>معرّف دائم واحد يعرض امتحاناتك القادمة ونتائجك السابقة. لا تحتاج إلى بريد إلكتروني أو حساب Google.</p></div>
+      <aside id="pwaInstallBanner" class="pwa-install-banner hidden" aria-live="polite">
+        <img src="/assets/pwa/icon-192.png" alt="" width="64" height="64">
+        <div class="pwa-install-copy"><strong>ثبّت برنامج القراءة الفردية</strong><span id="pwaInstallText">افتح صفحتك من أيقونة على الهاتف دون كتابة الرابط كل مرة.</span></div>
+        <button id="pwaInstallButton" class="button gold small" type="button">تثبيت التطبيق</button>
+        <button id="pwaInstallDismiss" class="icon-button" type="button" aria-label="إخفاء رسالة التثبيت">×</button>
+      </aside>
+      <div class="student-portal-shell">
+        <section id="studentEntry" class="student-entry-grid">
+          <form id="studentLoginForm" class="panel student-login-card"><span class="portal-step">لديَّ معرّف</span><h3>دخول الطالب</h3><p>اكتب معرّف الطالب الدائم الذي حصلت عليه عند التسجيل.</p><label>معرّف الطالب<input id="studentCode" required autocomplete="off" placeholder="ST-XXXX-XXXX-XXXX" dir="ltr"></label><button class="button primary" type="submit">فتح صفحتي</button><p class="form-message" id="studentLoginMessage"></p></form>
+          <div class="panel student-register-intro"><span class="portal-step">طالب جديد</span><h3>طلب إنشاء صفحة طالب</h3><p>يكفي أن تكتب اسمًا أو لقبًا تختاره. بقية المعلومات اختيارية تمامًا، والشيخ هو من يراجع الطلب ويقرر قبوله.</p><ol class="portal-steps"><li>أرسل طلبك واحفظ المعرّف الذي سيظهر.</li><li>انتظر موافقة الشيخ؛ لن تُحتسب ضمن الطلاب قبل الموافقة.</li><li>استخدم المعرّف نفسه لكل امتحان لاحق.</li></ol><button id="showRegistration" class="button gold" type="button">تسجيل طالب جديد</button></div>
+        </section>
+        <form id="studentRegistrationForm" class="panel student-registration hidden"><div class="registration-heading"><div><span class="portal-step">طلب جديد</span><h3>بيانات الطالب</h3><p>جميع الحقول اختيارية عدا الاسم أو اللقب المختار.</p></div><button id="cancelRegistration" class="icon-button" type="button" aria-label="العودة">×</button></div><div class="form-grid"><label>الاسم أو اللقب المختار <small>مطلوب</small><input name="name" maxlength="80" required placeholder="مثال: أبو عبد الله"></label><label>الجنس <small>اختياري</small><select name="gender"><option value="">لا أرغب بالإفصاح</option><option value="man">رجل</option><option value="woman">امرأة</option></select></label><label>الاسم الكامل <small>اختياري</small><input name="fullName" maxlength="120"></label><label>الفئة العمرية <small>اختياري</small><select name="ageRange"><option value="">بدون تحديد</option><option>أقل من 18</option><option>18–24</option><option>25–34</option><option>35–44</option><option>45 فأكثر</option></select></label><label>الدولة <small>اختياري</small><input name="country" maxlength="80"></label><label>المدينة <small>اختياري</small><input name="city" maxlength="80"></label><label>المستوى العلمي <small>اختياري</small><input name="education" maxlength="120"></label><label>وسيلة تواصل <small>اختياري ولا تظهر للعامة</small><input name="contact" maxlength="160" placeholder="واتساب أو تيليغرام"></label><label class="wide">نبذة أو ملاحظة للشيخ <small>اختياري</small><textarea name="about" maxlength="600"></textarea></label></div><div class="privacy-note"><b>خصوصيتك أولًا</b><span>لا نطلب بريدًا إلكترونيًا ولا حسابًا خارجيًا، ولن تظهر معلوماتك للزوار.</span></div><button class="button primary" type="submit">إرسال الطلب والحصول على المعرّف</button><p class="form-message" id="studentRegistrationMessage"></p></form>
+        <div id="studentDashboard" class="student-dashboard hidden"></div>
+        <div id="examWorkspace" class="panel hidden"></div>
+      </div>
+    </section>
+    <section id="ask" class="public-section ask-section public-view" data-public-view="ask">
+      <div class="section-heading light"><span>سؤال وجواب</span><h2>أبواب الأسئلة الشرعية</h2><p>اختر الباب الأقرب إلى سؤالك، ثم حدِّد صفة السائل: رجل أو امرأة. لن نطلب اسمًا أو رقم هاتف أو حسابًا.</p></div>
+      <div class="ask-layout">
+        <form id="askForm" class="panel question-form"><fieldset class="topic-fieldset"><legend>١. اختر باب السؤال</legend><div id="topicsGrid" class="topic-doors"><div class="muted">جارٍ تحميل الأبواب…</div></div></fieldset><fieldset class="gender-fieldset"><legend>٢. حدِّد صفة السائل</legend><div class="gender-choice"><label><input type="radio" name="gender" value="man" required><span>رجل</span></label><label><input type="radio" name="gender" value="woman"><span>امرأة</span></label></div></fieldset><label>٣. اكتب السؤال<textarea id="questionText" maxlength="2000" required placeholder="اكتب سؤالك بوضوح…"></textarea></label><button class="button gold" type="submit">إرسال السؤال بأمان</button><p id="askMessage" class="form-message"></p></form>
+        <div class="panel lookup"><h3>متابعة إجابة سابقة</h3><p>احتفظ بالرمز الذي يظهر بعد الإرسال؛ إذ تدل بدايته على باب السؤال وصفة السائل.</p><form id="lookupForm"><input id="lookupCode" placeholder="AQ-M-XXXXX-XXXXX" dir="ltr" required><button class="button primary">عرض الإجابة</button></form><div id="lookupResult"></div></div>
+      </div>
+      <div class="public-answers"><h3>إجابات منشورة للفائدة</h3><div id="answerFilters" class="answer-filters"></div><div id="answersList" class="answer-list"></div></div>
+    </section>
+  </main>
+  <footer><div class="brand"><span class="brand-mark small"><img src="/assets/reading-program-logo.jpg?v=1.8.4" alt=""></span><span><b id="footerTitle">برنامج القراءة الفردية</b><small>قراءة متأنية، وعلمٌ يُثمر عملًا</small></span></div><a class="sheikh-login" href="/admin"><span class="sheikh-login-icon" aria-hidden="true">↪</span><span><b>دخول الشيخ</b><small>لوحة الإدارة والمتابعة</small></span></a></footer>
+  <div id="socialFloat" class="social-float" aria-label="روابط التواصل"></div><div id="toast" class="toast" role="status"></div>
+</body></html>

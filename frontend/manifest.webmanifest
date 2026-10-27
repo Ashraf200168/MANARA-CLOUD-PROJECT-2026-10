@@ -1,0 +1,50 @@
+{
+  "id": "/",
+  "name": "برنامج القراءة الفردية",
+  "short_name": "القراءة الفردية",
+  "description": "صفحة الطالب والامتحانات والمكتبة في برنامج القراءة الفردية.",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/#exam",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#f4fbfe",
+  "theme_color": "#2d6686",
+  "categories": ["education", "books"],
+  "icons": [
+    {
+      "src": "/assets/pwa/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/pwa/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "صفحتي الطلابية",
+      "short_name": "صفحتي",
+      "url": "/#exam",
+      "icons": [{"src": "/assets/pwa/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "المكتبة",
+      "short_name": "المكتبة",
+      "url": "/#books",
+      "icons": [{"src": "/assets/pwa/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
+  ]
+}

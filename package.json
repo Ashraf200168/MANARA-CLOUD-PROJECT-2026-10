@@ -1,0 +1,20 @@
+{
+  "name": "manara-cloud-migration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:frontend": "node --check frontend/app.js && node --check frontend/admin.js && node --check frontend/api-client.js && node --check frontend/pwa.js && node --check frontend/service-worker.js",
+    "export:sqlite": "node migration/export-sqlite.mjs",
+    "import:supabase": "node migration/import-supabase.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "supabase": "2.122.0"
+  }
+}
