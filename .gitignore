@@ -31,6 +31,9 @@ analytics.settings
 
 # Build products and machine-specific mobile settings.
 **/build/
+**/bin/
+**/obj/
+**/publish/
 **/.dart_tool/
 **/.gradle/
 **/local.properties

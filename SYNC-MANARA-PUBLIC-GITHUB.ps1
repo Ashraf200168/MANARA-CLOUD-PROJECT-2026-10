@@ -101,7 +101,7 @@ function Assert-PublicTreeSafe {
     $full = Join-Path $projectRoot $relative
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { continue }
     $item = Get-Item -LiteralPath $full
-    if ($item.Length -gt 5MB -or $item.Extension -in @('.apk','.png','.jpg','.jpeg','.gif','.ico','.pdf','.zip')) { continue }
+    if ($item.Length -gt 5MB -or $item.Extension -in @('.apk','.exe','.png','.jpg','.jpeg','.gif','.ico','.pdf','.zip')) { continue }
     $text = Get-Content -LiteralPath $full -Raw -ErrorAction SilentlyContinue
     if ($text -and $text -match $secretRegex) { throw "A server secret/private key pattern was found in $relative" }
   }

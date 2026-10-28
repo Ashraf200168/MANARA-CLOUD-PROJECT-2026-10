@@ -727,6 +727,7 @@ MANARA FULL HANDS-OFF MODE IS ACTIVE AND HEALTHY
 | `supabase/migrations/` | مخطط PostgreSQL وتحديثاته |
 | `migration/` | تصدير واستيراد وتشفير واستعادة |
 | `release/` | APK المعتمد وبصمته |
+| `release/Manara-Backup-Now.exe` | مشغل محمول لإنشاء نسخة مشفرة فورية من أي مكان على الكمبيوتر |
 | `docs/` | وثائق المشروع والتشغيل |
 | `RUN-MANARA-BACKUP.ps1` | إنشاء النسخة المشفرة والتحقق منها |
 | `PUBLISH-MANARA-ENCRYPTED-BACKUP.ps1` | رفع أحدث نسخة إلى GitHub |

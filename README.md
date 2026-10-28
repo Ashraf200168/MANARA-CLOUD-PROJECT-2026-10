@@ -9,6 +9,7 @@
 - الموقع: <https://manara-cloud-preview.pages.dev/>
 - واجهة API: <https://zgzqoxxhiwrzxsgoqyyb.supabase.co/functions/v1/manara-api>
 - آخر تطبيق Android: [Manara App v1.4.1](release/Manara-App-v1.4.1-full-sheikh-exam-arm64.apk)
+- النسخ اليدوي الفوري: [Manara Backup EXE](release/Manara-Backup-Now.exe)
 
 ## ما يقدمه النظام
 
@@ -82,6 +83,7 @@ flutter build apk --release --target-platform android-arm64
 - [النسخ الاحتياطي والاستعادة](docs/BACKUP-AND-RECOVERY.md)
 - [التشغيل الذاتي والمراقبة](docs/OPERATIONS.md)
 - [التقرير الكامل للمشروع من البداية حتى الحالة الحالية](docs/MANARA-COMPLETE-PROJECT-REPORT.md)
+- [ملف EXE المحمول لإنشاء نسخة فورية](docs/PORTABLE-BACKUP-EXE.md)
 - [تاريخ المشروع والإصدارات](docs/PROJECT-HISTORY.md)
 - [سياسة الأمان](SECURITY.md)
 
