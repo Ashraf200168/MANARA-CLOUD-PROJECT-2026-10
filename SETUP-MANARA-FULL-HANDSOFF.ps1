@@ -3,6 +3,7 @@ $Host.UI.RawUI.WindowTitle = 'Manara Full Hands-Off Setup'
 $projectRoot = [IO.Path]::GetFullPath($PSScriptRoot)
 $maintenanceScript = Join-Path $projectRoot 'RUN-MANARA-MAINTENANCE.ps1'
 $publicSync = Join-Path $projectRoot 'SYNC-MANARA-PUBLIC-GITHUB.ps1'
+$maintenanceRunner = Join-Path $projectRoot 'RUN-MANARA-HANDSOFF.cmd'
 $backupConfig = Join-Path $projectRoot '.tools\backup\backup-config.json'
 $githubMarker = Join-Path $projectRoot '.tools\github-backup-publish\enabled'
 $statusPath = Join-Path $projectRoot '.tools\maintenance\last-status.json'
@@ -19,7 +20,11 @@ try {
   if (-not (Test-Path -LiteralPath $githubMarker)) {
     throw 'GitHub backup publishing is not enabled. Run START-MANARA-GITHUB-UPLOAD.bat first.'
   }
+  if (-not (Test-Path -LiteralPath $maintenanceRunner)) { throw 'The self-repairing maintenance runner is missing.' }
+  & cmd.exe /d /c "`"$maintenanceRunner`" --repair-only"
+  if ($LASTEXITCODE -ne 0) { throw 'The maintenance files could not be recovered from Git history.' }
   if (-not (Test-Path -LiteralPath $maintenanceScript)) { throw 'The maintenance script is missing.' }
+  if (-not (Test-Path -LiteralPath $publicSync)) { throw 'The GitHub synchronization script is missing.' }
 
   Write-Host '[1/3] Publishing the hands-off operations files to GitHub...' -ForegroundColor Cyan
   & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $publicSync
@@ -28,8 +33,8 @@ try {
   Write-Host ''
   Write-Host '[2/3] Registering the automatic maintenance task...' -ForegroundColor Cyan
   $taskName = 'Manara Full Hands-Off Maintenance'
-  $taskArgument = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$maintenanceScript`""
-  $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArgument
+  $taskArgument = "/d /c `"`"$maintenanceRunner`"`""
+  $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument $taskArgument
   $morning = New-ScheduledTaskTrigger -Daily -At '09:00'
   $evening = New-ScheduledTaskTrigger -Daily -At '19:00'
   $atLogon = New-ScheduledTaskTrigger -AtLogOn -User "$env:USERDOMAIN\$env:USERNAME"
@@ -39,7 +44,7 @@ try {
 
   Write-Host ''
   Write-Host '[3/3] Running the first complete health and recovery check...' -ForegroundColor Cyan
-  & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $maintenanceScript
+  & cmd.exe /d /c "`"$maintenanceRunner`""
   $maintenanceExit = $LASTEXITCODE
 
   Write-Host ''

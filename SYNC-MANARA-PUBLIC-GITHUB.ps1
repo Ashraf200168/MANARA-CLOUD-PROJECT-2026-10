@@ -11,6 +11,8 @@ $releaseApk = Join-Path $releaseRoot 'Manara-App-v1.4.1-full-sheikh-exam-arm64.a
 $releaseHash = "$releaseApk.sha256.txt"
 $logRoot = Join-Path $projectRoot '.tools\github-public'
 $logPath = Join-Path $logRoot 'publish.log'
+$mutex = New-Object Threading.Mutex($false, 'Local\ManaraPublicGitHubSync')
+$hasLock = $false
 
 function Write-PublishLog([string]$Message) {
   New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
@@ -106,6 +108,11 @@ function Assert-PublicTreeSafe {
 }
 
 try {
+  $hasLock = $mutex.WaitOne(0)
+  if (-not $hasLock) {
+    Write-PublishLog 'Another GitHub synchronization is already active; this duplicate run was skipped.'
+    exit 0
+  }
   Get-Command git -ErrorAction Stop | Out-Null
   Set-Location -LiteralPath $projectRoot
   Update-ReleaseApk
@@ -133,23 +140,34 @@ try {
   }
 
   if (-not $NoPush) {
-    $hasUpstream = Test-GitSuccess -GitArgs @('rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}')
-    if (-not $hasUpstream) {
-      $remoteMainExists = Test-GitSuccess -GitArgs @('ls-remote', '--exit-code', '--heads', 'origin', 'main')
-      if ($remoteMainExists) {
+    $pushSucceeded = $false
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+      try {
         Invoke-Git -GitArgs @('fetch', 'origin', 'main') | Out-Null
         $remoteMainIsAncestor = Test-GitSuccess -GitArgs @('merge-base', '--is-ancestor', 'origin/main', 'HEAD')
         if (-not $remoteMainIsAncestor) {
           Invoke-Git -GitArgs @('merge', '--allow-unrelated-histories', '-X', 'ours', '--no-edit', 'origin/main') | Out-Null
-          Write-PublishLog 'Merged the repository initialization already present on GitHub.'
+          Write-PublishLog 'Merged newer changes already present on GitHub before publishing.'
         }
+        Invoke-Git -GitArgs @('push', '-u', 'origin', 'main') | Out-Null
+        $pushSucceeded = $true
+        break
+      }
+      catch {
+        if ($attempt -ge 3) { throw }
+        Write-PublishLog "GitHub synchronization attempt $attempt failed; retrying after refreshing origin/main."
+        Start-Sleep -Seconds 10
       }
     }
-    Invoke-Git -GitArgs @('push', '-u', 'origin', 'main') | Out-Null
+    if (-not $pushSucceeded) { throw 'GitHub synchronization did not complete after three attempts.' }
     Write-PublishLog 'PUBLIC GITHUB SYNC SUCCESS'
   }
 }
 catch {
   Write-PublishLog "PUBLIC GITHUB SYNC FAILED: $($_.Exception.Message)"
   exit 1
+}
+finally {
+  if ($hasLock) { $mutex.ReleaseMutex() }
+  $mutex.Dispose()
 }
