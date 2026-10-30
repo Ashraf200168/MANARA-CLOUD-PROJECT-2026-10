@@ -156,6 +156,16 @@ class _SheikhExamsScreenState extends State<SheikhExamsScreen> {
                                         fontWeight: FontWeight.w800,
                                       ),
                                     ),
+                                  if (exam['book_id'] != null)
+                                    Text(
+                                      exam['is_book_final'] == true
+                                          ? 'الاختبار النهائي للكتاب'
+                                          : 'المرحلة ${exam['roadmap_position'] ?? '—'} من الكتاب',
+                                      style: const TextStyle(
+                                        color: Color(0xFF246B89),
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
                                 ],
                               ),
                             ],
@@ -855,10 +865,12 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
   late final TextEditingController instructions;
   late final TextEditingController duration;
   late final TextEditingController certificatePassPercentage;
+  late final TextEditingController roadmapPosition;
   int bookId = _noBookId;
   String status = 'draft';
   String accessMode = 'private';
   bool certificateEnabled = false;
+  bool isBookFinal = false;
   DateTime? startsAt;
   DateTime? endsAt;
 
@@ -883,6 +895,11 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
                   50)
               .toString(),
     );
+    roadmapPosition = TextEditingController(
+      text: (exam['roadmap_position'] ?? exam['roadmapPosition'] ?? '')
+          .toString(),
+    );
+    isBookFinal = exam['is_book_final'] == true || exam['isBookFinal'] == true;
     bookId = exam['book_id'] == null
         ? _noBookId
         : int.tryParse(exam['book_id'].toString()) ?? _noBookId;
@@ -900,6 +917,7 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
     instructions.dispose();
     duration.dispose();
     certificatePassPercentage.dispose();
+    roadmapPosition.dispose();
     super.dispose();
   }
 
@@ -939,9 +957,52 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
                   );
                 }),
               ],
-              onChanged: (value) => setState(() => bookId = value ?? _noBookId),
+              onChanged: (value) => setState(() {
+                bookId = value ?? _noBookId;
+                if (bookId == _noBookId) isBookFinal = false;
+              }),
             ),
             const SizedBox(height: 10),
+            if (bookId != _noBookId) ...[
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF4F8),
+                  border: Border.all(color: const Color(0xFF9CC4D3)),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: roadmapPosition,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'ترتيب الامتحان في خارطة الكتاب',
+                          helperText:
+                              'اتركه فارغًا ليُضاف تلقائيًا بعد آخر امتحان.',
+                          prefixIcon: Icon(Icons.route_outlined),
+                        ),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        value: isBookFinal,
+                        onChanged: (value) =>
+                            setState(() => isBookFinal = value),
+                        title: const Text(
+                          'هذا هو الامتحان النهائي للكتاب',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: const Text(
+                          'يظهر للشيخ كآخر محطة في متابعة إنجاز الطالب.',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
             DropdownButtonFormField<String>(
               initialValue: accessMode,
               isExpanded: true,
@@ -1055,6 +1116,18 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
           if (title.text.trim().isEmpty) return;
           final passPercentage =
               double.tryParse(certificatePassPercentage.text.trim()) ?? 50;
+          final roadmapText = roadmapPosition.text.trim();
+          final roadmapValue = int.tryParse(roadmapText);
+          if (bookId != _noBookId &&
+              roadmapText.isNotEmpty &&
+              (roadmapValue == null || roadmapValue <= 0)) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('ترتيب الامتحان يجب أن يكون رقمًا أكبر من صفر.'),
+              ),
+            );
+            return;
+          }
           if (certificateEnabled &&
               (passPercentage < 0 || passPercentage > 100)) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1075,6 +1148,8 @@ class _ExamEditorDialogState extends State<ExamEditorDialog> {
             'instructions': instructions.text.trim(),
             'certificateEnabled': certificateEnabled,
             'certificatePassPercentage': passPercentage,
+            'roadmapPosition': bookId == _noBookId ? null : roadmapValue,
+            'isBookFinal': bookId != _noBookId && isBookFinal,
           });
         },
         child: const Text('حفظ'),
@@ -1095,7 +1170,12 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
   late final TextEditingController prompt;
   late final TextEditingController points;
   late final TextEditingController details;
-  late final TextEditingController correctIndex;
+  late final List<TextEditingController> choiceOptions;
+  late final Map<String, dynamic> originalData;
+  final Map<String, String> detailDrafts = {};
+  int? correctChoice;
+  String? validationMessage;
+  bool validateChoices = false;
   late final TextEditingController explanation;
   late final TextEditingController evidence;
   late final TextEditingController guidance;
@@ -1109,13 +1189,28 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
     final data = Map<String, dynamic>.from(
       question['data'] as Map? ?? question['data_json'] as Map? ?? const {},
     );
+    originalData = data;
     type = question['type']?.toString() ?? 'choice';
     prompt = TextEditingController(text: question['prompt']?.toString());
     points = TextEditingController(text: (question['points'] ?? 1).toString());
-    correctIndex = TextEditingController(
-      text: ((int.tryParse(data['correct']?.toString() ?? '') ?? 0) + 1)
-          .toString(),
-    );
+    final existingOptions = type == 'choice' && data['options'] is List
+        ? List<dynamic>.from(data['options'] as List)
+        : const <dynamic>[];
+    choiceOptions = existingOptions.isEmpty
+        ? List.generate(3, (_) => TextEditingController())
+        : existingOptions
+              .map((value) => TextEditingController(text: value.toString()))
+              .toList();
+    while (choiceOptions.length < 2) {
+      choiceOptions.add(TextEditingController());
+    }
+    final existingCorrect = int.tryParse(data['correct']?.toString() ?? '');
+    if (type == 'choice' &&
+        existingCorrect != null &&
+        existingCorrect >= 0 &&
+        existingCorrect < existingOptions.length) {
+      correctChoice = existingCorrect;
+    }
     trueFalse = data['correct'] is bool ? data['correct'] as bool : true;
     details = TextEditingController(text: _detailsFor(type, data));
     explanation = TextEditingController(text: data['explanation']?.toString());
@@ -1124,11 +1219,6 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
   }
 
   static String _detailsFor(String type, Map<String, dynamic> data) {
-    if (type == 'choice') {
-      return List<dynamic>.from(
-        data['options'] as List? ?? const [],
-      ).join('\n');
-    }
     if (type == 'matching') {
       return List<dynamic>.from(data['pairs'] as List? ?? const [])
           .map((raw) {
@@ -1151,7 +1241,7 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
       prompt,
       points,
       details,
-      correctIndex,
+      ...choiceOptions,
       explanation,
       evidence,
       guidance,
@@ -1172,6 +1262,8 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
           children: [
             DropdownButtonFormField<String>(
               initialValue: type,
+              isExpanded: true,
+              alignment: AlignmentDirectional.centerStart,
               decoration: const InputDecoration(labelText: 'نوع السؤال'),
               items: const [
                 DropdownMenuItem(
@@ -1186,8 +1278,10 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
                 DropdownMenuItem(value: 'short', child: Text('إجابة قصيرة')),
               ],
               onChanged: (value) => setState(() {
+                detailDrafts[type] = details.text;
                 type = value ?? 'choice';
-                details.clear();
+                details.text = detailDrafts[type] ?? '';
+                validationMessage = null;
               }),
             ),
             const SizedBox(height: 10),
@@ -1207,6 +1301,8 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
             if (type == 'truefalse')
               DropdownButtonFormField<bool>(
                 initialValue: trueFalse,
+                isExpanded: true,
+                alignment: AlignmentDirectional.centerStart,
                 decoration: const InputDecoration(labelText: 'الإجابة الصحيحة'),
                 items: const [
                   DropdownMenuItem(value: true, child: Text('صح')),
@@ -1214,29 +1310,19 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
                 ],
                 onChanged: (value) => trueFalse = value ?? true,
               )
+            else if (type == 'choice')
+              _choiceFields()
             else ...[
               TextField(
                 controller: details,
                 minLines: 4,
                 maxLines: 9,
                 decoration: InputDecoration(
-                  labelText: type == 'choice'
-                      ? 'الخيارات — خيار في كل سطر'
-                      : type == 'matching'
+                  labelText: type == 'matching'
                       ? 'أزواج المطابقة — العنصر | مقابله'
                       : 'الإجابات المقبولة — إجابة في كل سطر',
                 ),
               ),
-              if (type == 'choice') ...[
-                const SizedBox(height: 10),
-                TextField(
-                  controller: correctIndex,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'رقم الإجابة الصحيحة (يبدأ من 1)',
-                  ),
-                ),
-              ],
             ],
             const SizedBox(height: 10),
             TextField(
@@ -1264,6 +1350,17 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
       ),
     ),
     actions: [
+      if (validationMessage != null)
+        SizedBox(
+          width: double.maxFinite,
+          child: Semantics(
+            liveRegion: true,
+            child: Text(
+              validationMessage!,
+              style: const TextStyle(color: Color(0xFFB3261E)),
+            ),
+          ),
+        ),
       TextButton(
         onPressed: () => Navigator.pop(context),
         child: const Text('إلغاء'),
@@ -1272,22 +1369,156 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
     ],
   );
 
+  Widget _choiceFields() => RadioGroup<int>(
+    groupValue: correctChoice,
+    onChanged: (value) => setState(() => correctChoice = value),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('الإجابات', style: TextStyle(fontWeight: FontWeight.w900)),
+        const Text(
+          'اكتب كل إجابة في خانتها وحدّد الصحيحة. يمكنك حذف خانة للاكتفاء بإجابتين.',
+        ),
+        const SizedBox(height: 10),
+        for (var index = 0; index < choiceOptions.length; index++)
+          Container(
+            key: ObjectKey(choiceOptions[index]),
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: correctChoice == index
+                  ? const Color(0xFFEAF6EF)
+                  : const Color(0xFFF5F9FC),
+              border: Border.all(
+                color: correctChoice == index
+                    ? const Color(0xFF29805B)
+                    : const Color(0xFFCADCE5),
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'الإجابة ${index + 1}',
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'حذف الإجابة ${index + 1}',
+                      onPressed: choiceOptions.length <= 2
+                          ? null
+                          : () => _removeChoice(index),
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+                TextField(
+                  controller: choiceOptions[index],
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.newline,
+                  onChanged: (_) {
+                    if (validateChoices) setState(() {});
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'نص الإجابة ${index + 1}',
+                    errorText:
+                        validateChoices &&
+                            choiceOptions[index].text.trim().isEmpty
+                        ? 'اكتب نص الإجابة أو احذف الخانة.'
+                        : null,
+                  ),
+                ),
+                RadioListTile<int>(
+                  value: index,
+                  title: Text(
+                    correctChoice == index
+                        ? 'هذه هي الإجابة الصحيحة'
+                        : 'تحديد كإجابة صحيحة',
+                  ),
+                  selected: correctChoice == index,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ],
+            ),
+          ),
+        OutlinedButton.icon(
+          onPressed: () =>
+              setState(() => choiceOptions.add(TextEditingController())),
+          icon: const Icon(Icons.add),
+          label: const Text('إضافة إجابة'),
+        ),
+      ],
+    ),
+  );
+
+  void _removeChoice(int index) {
+    final removed = choiceOptions[index];
+    setState(() {
+      choiceOptions.removeAt(index);
+      if (correctChoice == index) {
+        correctChoice = null;
+      } else if (correctChoice != null && correctChoice! > index) {
+        correctChoice = correctChoice! - 1;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => removed.dispose());
+  }
+
+  void _invalid(String message) => setState(() => validationMessage = message);
+
   void _save() {
-    if (prompt.text.trim().isEmpty) return;
+    if (prompt.text.trim().isEmpty) {
+      _invalid('اكتب نص السؤال.');
+      return;
+    }
+    final questionPoints = double.tryParse(points.text.trim());
+    if (questionPoints == null ||
+        !questionPoints.isFinite ||
+        questionPoints < .25) {
+      _invalid('اكتب درجة صالحة لا تقل عن 0.25.');
+      return;
+    }
     final lines = details.text
         .split(RegExp(r'\r?\n'))
         .map((value) => value.trim())
         .where((value) => value.isNotEmpty)
         .toList();
     final data = <String, dynamic>{
+      ...originalData,
       'explanation': explanation.text.trim(),
       'evidence': evidence.text.trim(),
       'guidance': guidance.text.trim(),
     };
+    for (final key in ['options', 'correct', 'pairs', 'accepted']) {
+      data.remove(key);
+    }
     if (type == 'choice') {
-      if (lines.length < 2) return;
-      data['options'] = lines;
-      data['correct'] = (int.tryParse(correctIndex.text) ?? 1) - 1;
+      final options = choiceOptions
+          .map((controller) => controller.text.trim())
+          .toList();
+      setState(() => validateChoices = true);
+      if (options.any((value) => value.isEmpty)) {
+        _invalid('أكمل جميع الإجابات أو احذف الخانات الفارغة.');
+        return;
+      }
+      if (options.map((value) => value.toLowerCase()).toSet().length !=
+          options.length) {
+        _invalid('توجد إجابات مكررة. اجعل كل إجابة مختلفة.');
+        return;
+      }
+      if (correctChoice == null ||
+          correctChoice! < 0 ||
+          correctChoice! >= options.length) {
+        _invalid('حدّد الإجابة الصحيحة قبل الحفظ.');
+        return;
+      }
+      data['options'] = options;
+      data['correct'] = correctChoice;
     } else if (type == 'truefalse') {
       data['correct'] = trueFalse;
     } else if (type == 'matching') {
@@ -1298,16 +1529,22 @@ class _QuestionEditorDialogState extends State<QuestionEditorDialog> {
           )
           .map((parts) => {'left': parts[0], 'right': parts[1]})
           .toList();
-      if (pairs.length < 2) return;
+      if (pairs.length < 2) {
+        _invalid('أضف زوجين صالحين للمطابقة على الأقل.');
+        return;
+      }
       data['pairs'] = pairs;
     } else {
-      if (lines.isEmpty) return;
+      if (lines.isEmpty) {
+        _invalid('اكتب إجابة مقبولة واحدة على الأقل.');
+        return;
+      }
       data['accepted'] = lines;
     }
     Navigator.pop(context, {
       'type': type,
       'prompt': prompt.text.trim(),
-      'points': double.tryParse(points.text) ?? 1,
+      'points': questionPoints,
       'data': data,
     });
   }

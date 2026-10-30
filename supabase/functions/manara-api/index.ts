@@ -181,6 +181,139 @@ async function adminStudents(){
   return {stats:{totalStudents:students.length,pendingRequests:pending.length,submitted:submitted.length,averagePercentage:scored.length?Math.round(scored.reduce((sum:number,item:any)=>sum+Number(item.percentage||0),0)/scored.length):0},students,pending,rejected};
 }
 
+function positiveInteger(value: unknown) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function nextRoadmapPosition(bookId: number) {
+  const result = await db.from('exams')
+    .select('roadmap_position')
+    .eq('book_id', bookId)
+    .order('roadmap_position', { ascending: false, nullsFirst: false })
+    .limit(1);
+  if (result.error) throw new Error(result.error.message);
+  return Number(result.data?.[0]?.roadmap_position || 0) + 1;
+}
+
+async function bookRoadmap(bookId: number) {
+  const book = await one<any>(
+    db.from('books').select('id,title,description,created_at').eq('id', bookId).maybeSingle(),
+    'الكتاب غير موجود',
+  );
+  const examsResult = await db.from('exams')
+    .select('id,title,status,roadmap_position,is_book_final,created_at,questions(id,points)')
+    .eq('book_id', bookId)
+    .eq('access_mode', 'private')
+    .order('is_book_final', { ascending: true })
+    .order('roadmap_position', { ascending: true, nullsFirst: false })
+    .order('id', { ascending: true });
+  if (examsResult.error) throw new Error(examsResult.error.message);
+  const rawExams = examsResult.data || [];
+  const examIds = rawExams.map((exam: any) => Number(exam.id));
+  let assignments: any[] = [];
+  if (examIds.length) {
+    for (let offset = 0; ; offset += 1000) {
+      const assignmentsResult = await db.from('assignments')
+      .select('id,exam_id,student_id,status,students(id,name,student_code,is_test,status),attempts(started_at,submitted_at,score,max_score,violation_type)')
+      .in('exam_id', examIds)
+      .order('id')
+      .range(offset, offset + 999);
+      if (assignmentsResult.error) throw new Error(assignmentsResult.error.message);
+      assignments.push(...(assignmentsResult.data || []));
+      if ((assignmentsResult.data || []).length < 1000) break;
+    }
+  }
+  const exams = rawExams.map((exam: any, index: number) => ({
+    id: Number(exam.id),
+    title: exam.title,
+    status: exam.status,
+    roadmapPosition: positiveInteger(exam.roadmap_position) || index + 1,
+    isFinal: Boolean(exam.is_book_final),
+    countsTowardCompletion: exam.status !== 'draft',
+    questionCount: exam.questions?.length || 0,
+    totalPoints: (exam.questions || []).reduce((sum: number, question: any) => sum + Number(question.points || 0), 0),
+  }));
+  const activeExams = exams.filter((exam: any) => exam.countsTowardCompletion);
+  const finalExam = exams.find((exam: any) => exam.isFinal) || null;
+  const people = new Map<number, any>();
+  const assignmentByStudentAndExam = new Map<string, any>();
+  for (const assignment of assignments) {
+    const person = Array.isArray(assignment.students) ? assignment.students[0] : assignment.students;
+    if (!person || person.is_test || person.status !== 'approved') continue;
+    people.set(Number(person.id), person);
+    assignmentByStudentAndExam.set(`${person.id}:${assignment.exam_id}`, assignment);
+  }
+  const students = [...people.values()].map((person: any) => {
+    let completedExams = 0, earnedScore = 0, availableScore = 0;
+    const examProgress = exams.map((exam: any) => {
+      const assignment = assignmentByStudentAndExam.get(`${person.id}:${exam.id}`);
+      if (!assignment) return { examId: exam.id, status: 'not_assigned', assignmentStatus: null, score: null, maxScore: null, percentage: null, submittedAt: null, violationType: null };
+      const attempt = Array.isArray(assignment.attempts) ? assignment.attempts[0] : assignment.attempts;
+      const submitted = Boolean(attempt?.submitted_at), violationType = attempt?.violation_type || null;
+      const maxScore = submitted && attempt?.max_score != null ? Number(attempt.max_score) : null;
+      const score = submitted && attempt?.score != null ? Number(attempt.score) : null;
+      const percentage = maxScore && maxScore > 0 && score != null ? Math.round(score * 100 / maxScore) : null;
+      const validCompletion = submitted && !violationType && maxScore != null && Number.isFinite(maxScore) && maxScore > 0 && score != null && Number.isFinite(score);
+      if (exam.countsTowardCompletion && validCompletion) {
+        completedExams++;
+        earnedScore += score || 0;
+        availableScore += maxScore;
+      }
+      return {
+        examId: exam.id,
+        status: violationType ? 'violation' : submitted ? 'completed' : assignment.status || 'ready',
+        assignmentStatus: assignment.status || null,
+        score,
+        maxScore,
+        percentage,
+        submittedAt: attempt?.submitted_at || null,
+        violationType,
+      };
+    });
+    const totalExams = activeExams.length;
+    const finalProgress = finalExam ? examProgress.find((progress: any) => progress.examId === finalExam.id) : null;
+    return {
+      id: Number(person.id),
+      name: person.name,
+      studentCode: person.student_code,
+      completedExams,
+      totalExams,
+      completionRate: totalExams ? Math.round(completedExams * 100 / totalExams) : 0,
+      averagePercentage: availableScore > 0 ? Math.round(earnedScore * 100 / availableScore) : null,
+      earnedScore,
+      assessedMaxScore: availableScore,
+      finalStatus: finalProgress?.status || (finalExam ? 'not_assigned' : 'not_configured'),
+      exams: examProgress,
+    };
+  }).sort((a: any, b: any) => b.completionRate - a.completionRate || String(a.name).localeCompare(String(b.name), 'ar'));
+  const averageCompletion = students.length ? Math.round(students.reduce((sum: number, person: any) => sum + person.completionRate, 0) / students.length) : 0;
+  return {
+    book,
+    exams,
+    finalExam,
+    summary: {
+      totalExams: exams.length,
+      activeExams: activeExams.length,
+      students: students.length,
+      averageCompletion,
+      completedStudents: students.filter((person: any) => activeExams.length > 0 && person.completedExams === activeExams.length).length,
+    },
+    students,
+  };
+}
+
+async function bookRoadmapOverview() {
+  const booksResult = await db.from('books').select('id').order('id', { ascending: false });
+  if (booksResult.error) throw new Error(booksResult.error.message);
+  const roadmaps = await Promise.all((booksResult.data || []).map((book: any) => bookRoadmap(Number(book.id))));
+  return roadmaps.map((roadmap: any) => ({
+    book: roadmap.book,
+    finalExam: roadmap.finalExam,
+    summary: roadmap.summary,
+  }));
+}
+
 function publicQuestion(row: any) {
   const data=row.data_json||{}, base={id:row.id,type:row.type,prompt:row.prompt,points:Number(row.points),position:row.position};
   if(row.type==='choice')return {...base,options:data.options||[]};
@@ -343,7 +476,7 @@ async function integrityReturn(assignment:any){
 
 async function route(request: Request, path: string): Promise<Response> {
   const method = request.method,currentUrl=new URL(request.url);
-  if (path === '/api/health' && method === 'GET') return jsonResponse(request,{ok:true,version:'cloud-baseline-1.8.7',database:'ready',storage:'ready',backend:'supabase',time:now()});
+  if (path === '/api/health' && method === 'GET') return jsonResponse(request,{ok:true,version:'cloud-baseline-1.9.0',database:'ready',storage:'ready',backend:'supabase',time:now()});
   if (path === '/api/public/home' && method === 'GET') return jsonResponse(request,await publicHome());
   if (path === '/api/public/visit' && method === 'POST') {
     const value = await body(request), visitor = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || randomToken(12);
@@ -425,15 +558,17 @@ async function route(request: Request, path: string): Promise<Response> {
   if(path==='/api/admin/support'&&method==='GET'){const {data,error}=await db.from('support_tickets').select('*,students(name,student_code)').order('id',{ascending:false});if(error)throw new Error(error.message);return jsonResponse(request,(data||[]).map((item:any)=>({...item,student_name:item.students?.name,student_code:item.students?.student_code})));}
   const supportAdmin=path.match(/^\/api\/admin\/support\/(\d+)$/);if(supportAdmin&&method==='PUT'){const value=await body(request),reply=String(value.reply||'').trim().slice(0,4000),status=['new','answered','closed'].includes(value.status)?value.status:(reply?'answered':'new'),stamp=now();const result=await db.from('support_tickets').update({reply,status,updated_at:stamp,...(status==='answered'?{replied_at:stamp}:{})}).eq('id',supportAdmin[1]);if(result.error)throw new Error(result.error.message);return jsonResponse(request,{ok:true});}
   if(path==='/api/admin/books'&&method==='GET'){const {data,error}=await db.from('books').select('id,title,description,original_name,created_at').order('id',{ascending:false});if(error)throw new Error(error.message);return jsonResponse(request,data);}
+  if(path==='/api/admin/book-roadmaps'&&method==='GET')return jsonResponse(request,await bookRoadmapOverview());
+  const bookRoadmapRoute=path.match(/^\/api\/admin\/books\/(\d+)\/roadmap$/);if(bookRoadmapRoute&&method==='GET')return jsonResponse(request,await bookRoadmap(Number(bookRoadmapRoute[1])));
   if(path==='/api/admin/books'&&method==='POST'){const title=String(currentUrl.searchParams.get('title')||'').trim(),description=String(currentUrl.searchParams.get('description')||'').trim(),original=String(currentUrl.searchParams.get('name')||'book.pdf').replace(/[^\p{L}\p{N}._ -]/gu,'_');if(!title)fail(400,'اسم الكتاب مطلوب');const bytes=new Uint8Array(await request.arrayBuffer());if(bytes.length<5||new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')fail(400,'الملف يجب أن يكون PDF صالحًا');const file=`${Date.now()}-${randomToken(4)}.pdf`,upload=await db.storage.from('manara-books').upload(file,bytes,{contentType:'application/pdf'});if(upload.error)throw new Error(upload.error.message);const created=await one<any>(db.from('books').insert({title,description,file_name:file,original_name:original}).select('id').single());return jsonResponse(request,{id:created.id},201);}
   const bookAdmin=path.match(/^\/api\/admin\/books\/(\d+)$/);if(bookAdmin&&method==='DELETE'){const row=await one<any>(db.from('books').select('file_name').eq('id',bookAdmin[1]).maybeSingle(),'الكتاب غير موجود');await db.from('books').delete().eq('id',bookAdmin[1]);await db.storage.from('manara-books').remove([row.file_name]);return jsonResponse(request,{ok:true});}
   if(path==='/api/admin/advice'&&method==='GET'){const {data,error}=await db.from('advice').select('*').order('id',{ascending:false});if(error)throw new Error(error.message);return jsonResponse(request,data);}
   if(path==='/api/admin/advice'&&method==='POST'){const value=await body(request),text=String(value.text||'').trim();if(!text)fail(400,'نص الفائدة مطلوب');const created=await one<any>(db.from('advice').insert({text,author:String(value.author||'').trim(),active:value.active!==false}).select('id').single());return jsonResponse(request,{id:created.id},201);}
   const adviceAdmin=path.match(/^\/api\/admin\/advice\/(\d+)$/);if(adviceAdmin&&method==='DELETE'){await db.from('advice').delete().eq('id',adviceAdmin[1]);return jsonResponse(request,{ok:true});}
   if(path==='/api/admin/exams'&&method==='GET'){const {data,error}=await db.from('exams').select('*,books(title),questions(id,points),assignments(id,students(is_test))').order('id',{ascending:false});if(error)throw new Error(error.message);return jsonResponse(request,(data||[]).map((item:any)=>({...item,book_title:item.books?.title||null,question_count:item.questions?.length||0,total_points:(item.questions||[]).reduce((sum:number,q:any)=>sum+Number(q.points),0),student_count:(item.assignments||[]).filter((a:any)=>!a.students?.is_test).length})));}
-  if(path==='/api/admin/exams'&&method==='POST'){const value=await body(request),title=String(value.title||'').trim();if(!title)fail(400,'عنوان الامتحان مطلوب');const created=await one<any>(db.from('exams').insert({title,book_id:value.bookId||null,instructions:String(value.instructions||''),starts_at:value.startsAt||null,ends_at:value.endsAt||null,duration_minutes:Math.max(1,Number(value.durationMinutes)||30),status:['draft','published','closed'].includes(value.status)?value.status:'draft',access_mode:value.accessMode==='public'?'public':'private',certificate_enabled:value.certificateEnabled===true,certificate_pass_percentage:boundedPercentage(value.certificatePassPercentage,50)}).select('id').single());return jsonResponse(request,{id:created.id},201);}
+  if(path==='/api/admin/exams'&&method==='POST'){const value=await body(request),title=String(value.title||'').trim(),bookId=positiveInteger(value.bookId);if(!title)fail(400,'عنوان الامتحان مطلوب');const roadmapPosition=bookId?(positiveInteger(value.roadmapPosition)||await nextRoadmapPosition(bookId)):null;const created=await one<any>(db.from('exams').insert({title,book_id:bookId,instructions:String(value.instructions||''),starts_at:value.startsAt||null,ends_at:value.endsAt||null,duration_minutes:Math.max(1,Number(value.durationMinutes)||30),status:['draft','published','closed'].includes(value.status)?value.status:'draft',access_mode:value.accessMode==='public'?'public':'private',certificate_enabled:value.certificateEnabled===true,certificate_pass_percentage:boundedPercentage(value.certificatePassPercentage,50),roadmap_position:roadmapPosition,is_book_final:Boolean(bookId&&value.isBookFinal===true)}).select('id').single());return jsonResponse(request,{id:created.id},201);}
   const examAdmin=path.match(/^\/api\/admin\/exams\/(\d+)$/);if(examAdmin&&method==='GET'){const exam=await one<any>(db.from('exams').select('*').eq('id',examAdmin[1]).maybeSingle(),'الامتحان غير موجود'),questionsResult=await db.from('questions').select('*').eq('exam_id',exam.id).order('position').order('id'),assignmentsResult=await db.from('assignments').select('*,students(name,gender,student_code,is_test)').eq('exam_id',exam.id).order('id'),studentsResult=await db.from('students').select('id,name,student_code').eq('is_test',false).eq('status','approved').order('name');const assigned=new Set((assignmentsResult.data||[]).map((item:any)=>item.student_id));return jsonResponse(request,{exam,questions:(questionsResult.data||[]).map((q:any)=>({...q,data:q.data_json||{}})),assignments:(assignmentsResult.data||[]).map((item:any)=>({...item,...item.students})),availableStudents:(studentsResult.data||[]).filter((item:any)=>!assigned.has(item.id))});}
-  if(examAdmin&&method==='PUT'){const current=await one<any>(db.from('exams').select('*').eq('id',examAdmin[1]).maybeSingle(),'الامتحان غير موجود'),value=await body(request),has=(name:string)=>Object.prototype.hasOwnProperty.call(value,name);const result=await db.from('exams').update({title:String(value.title??current.title).trim(),book_id:has('bookId')?value.bookId??null:current.book_id,instructions:String(value.instructions??current.instructions),starts_at:has('startsAt')?value.startsAt??null:current.starts_at,ends_at:has('endsAt')?value.endsAt??null:current.ends_at,duration_minutes:Math.max(1,Number(value.durationMinutes??current.duration_minutes)),status:['draft','published','closed'].includes(value.status)?value.status:current.status,access_mode:value.accessMode==='public'?'public':value.accessMode==='private'?'private':current.access_mode,certificate_enabled:value.certificateEnabled===undefined?Boolean(current.certificate_enabled):value.certificateEnabled===true,certificate_pass_percentage:boundedPercentage(value.certificatePassPercentage,current.certificate_pass_percentage==null?50:Number(current.certificate_pass_percentage))}).eq('id',current.id);if(result.error)throw new Error(result.error.message);return jsonResponse(request,{ok:true});}
+  if(examAdmin&&method==='PUT'){const current=await one<any>(db.from('exams').select('*').eq('id',examAdmin[1]).maybeSingle(),'الامتحان غير موجود'),value=await body(request),has=(name:string)=>Object.prototype.hasOwnProperty.call(value,name),bookId=has('bookId')?positiveInteger(value.bookId):positiveInteger(current.book_id),sameBook=bookId===positiveInteger(current.book_id);const roadmapPosition=bookId?(positiveInteger(value.roadmapPosition)||(sameBook?positiveInteger(current.roadmap_position):null)||await nextRoadmapPosition(bookId)):null;const result=await db.from('exams').update({title:String(value.title??current.title).trim(),book_id:bookId,instructions:String(value.instructions??current.instructions),starts_at:has('startsAt')?value.startsAt??null:current.starts_at,ends_at:has('endsAt')?value.endsAt??null:current.ends_at,duration_minutes:Math.max(1,Number(value.durationMinutes??current.duration_minutes)),status:['draft','published','closed'].includes(value.status)?value.status:current.status,access_mode:value.accessMode==='public'?'public':value.accessMode==='private'?'private':current.access_mode,certificate_enabled:value.certificateEnabled===undefined?Boolean(current.certificate_enabled):value.certificateEnabled===true,certificate_pass_percentage:boundedPercentage(value.certificatePassPercentage,current.certificate_pass_percentage==null?50:Number(current.certificate_pass_percentage)),roadmap_position:roadmapPosition,is_book_final:Boolean(bookId&&(value.isBookFinal===undefined?current.is_book_final:value.isBookFinal===true))}).eq('id',current.id);if(result.error)throw new Error(result.error.message);return jsonResponse(request,{ok:true});}
   if(examAdmin&&method==='DELETE'){await db.from('exams').delete().eq('id',examAdmin[1]);return jsonResponse(request,{ok:true});}
   const questionsCollection=path.match(/^\/api\/admin\/exams\/(\d+)\/questions$/);if(questionsCollection&&method==='POST'){const value=await body(request);if(!['choice','truefalse','matching','short'].includes(value.type))fail(400,'نوع السؤال غير مدعوم');const prompt=String(value.prompt||'').trim();if(!prompt)fail(400,'نص السؤال مطلوب');const existing=await db.from('questions').select('position').eq('exam_id',questionsCollection[1]).order('position',{ascending:false}).limit(1),position=Number(existing.data?.[0]?.position||0)+1,created=await one<any>(db.from('questions').insert({exam_id:Number(questionsCollection[1]),type:value.type,prompt,points:Math.max(.25,Number(value.points)||1),data_json:value.data||{},position}).select('id').single());return jsonResponse(request,{id:created.id},201);}
   const questionAdmin=path.match(/^\/api\/admin\/questions\/(\d+)$/);if(questionAdmin&&method==='PUT'){const current=await one<any>(db.from('questions').select('*').eq('id',questionAdmin[1]).maybeSingle(),'السؤال غير موجود'),value=await body(request),result=await db.from('questions').update({type:value.type||current.type,prompt:String(value.prompt??current.prompt),points:Math.max(.25,Number(value.points??current.points)),data_json:value.data??current.data_json,position:Number(value.position??current.position)}).eq('id',current.id);if(result.error)throw new Error(result.error.message);return jsonResponse(request,{ok:true});}
@@ -451,7 +586,7 @@ async function route(request: Request, path: string): Promise<Response> {
   if(path==='/api/admin/inquiries'&&method==='GET'){const {data,error}=await db.from('inquiries').select('*,inquiry_topics(code,name,icon)').order('id',{ascending:false});if(error)throw new Error(error.message);return jsonResponse(request,(data||[]).sort((a:any,b:any)=>(a.status==='new'?-1:1)-(b.status==='new'?-1:1)).map((item:any)=>({...item,topic_code:item.inquiry_topics?.code,topic_name:item.inquiry_topics?.name,topic_icon:item.inquiry_topics?.icon})));}
   const inquiryAdmin=path.match(/^\/api\/admin\/inquiries\/(\d+)$/);if(inquiryAdmin&&method==='PUT'){const value=await body(request),status=value.status==='answered'?'answered':'new',result=await db.from('inquiries').update({answer:String(value.answer||''),status,publish_public:Boolean(value.publishPublic),...(status==='answered'?{answered_at:now()}:{})}).eq('id',inquiryAdmin[1]);if(result.error)throw new Error(result.error.message);return jsonResponse(request,{ok:true});}
   if(path==='/api/admin/question-bank'&&method==='GET'){const {data,error}=await db.from('question_bank').select('type,category,difficulty,bank_source').eq('active',true);if(error)throw new Error(error.message);const rows=data||[],countBy=(field:string)=>Object.entries(rows.reduce((out:any,item:any)=>(out[item[field]||'']=(out[item[field]||'']+1),out),{})).filter(([name])=>name).map(([name,count])=>({[field==='bank_source'?'source':field]:name,count}));return jsonResponse(request,{total:rows.length,choice:rows.filter((q:any)=>q.type==='choice').length,truefalse:rows.filter((q:any)=>q.type==='truefalse').length,categoryCount:new Set(rows.map((q:any)=>q.category).filter(Boolean)).size,categories:countBy('category'),difficulties:countBy('difficulty'),sources:countBy('bank_source')});}
-  if(path==='/api/admin/exams/from-bank'&&method==='POST'){const value=await body(request),title=String(value.title||'').trim(),questionCount=Math.min(100,Math.max(1,Number(value.questionCount)||50)),points=Math.min(100,Math.max(.25,Number(value.pointsPerQuestion)||2));if(!title)fail(400,'عنوان الامتحان مطلوب');let query=db.from('question_bank').select('*').eq('active',true);if(value.category)query=query.eq('category',String(value.category));if(value.difficulty)query=query.eq('difficulty',String(value.difficulty));const bank=await query;if(bank.error)throw new Error(bank.error.message);const shuffled=(bank.data||[]).sort(()=>Math.random()-.5).slice(0,questionCount);if(shuffled.length<questionCount)fail(400,`لا يتوافر في المرشح سوى ${shuffled.length} سؤالًا`);const exam=await one<any>(db.from('exams').insert({title,book_id:value.bookId||null,instructions:String(value.instructions||'اقرأ الأسئلة بعناية، وأجب عنها بنفسك وفق تعهّد الأمانة العلمية.'),starts_at:value.startsAt||null,ends_at:value.endsAt||null,duration_minutes:Math.max(1,Number(value.durationMinutes)||60),status:['draft','published','closed'].includes(value.status)?value.status:'draft',access_mode:value.accessMode==='public'?'public':'private'}).select('id').single());const rows=shuffled.map((q:any,index:number)=>({exam_id:exam.id,type:q.type,prompt:q.prompt,points,data_json:{...(q.data_json||{}),bank:{id:q.id,sourceKey:q.source_key,originalCode:q.original_code,category:q.category,topic:q.topic,difficulty:q.difficulty,sourceNote:q.source_note,bankSource:q.bank_source}},position:index+1})),inserted=await db.from('questions').insert(rows);if(inserted.error)throw new Error(inserted.error.message);return jsonResponse(request,{id:exam.id,questionCount:rows.length,totalPoints:rows.length*points,choice:rows.filter((q:any)=>q.type==='choice').length,truefalse:rows.filter((q:any)=>q.type==='truefalse').length},201);}
+  if(path==='/api/admin/exams/from-bank'&&method==='POST'){const value=await body(request),title=String(value.title||'').trim(),questionCount=Math.min(100,Math.max(1,Number(value.questionCount)||50)),points=Math.min(100,Math.max(.25,Number(value.pointsPerQuestion)||2)),bookId=positiveInteger(value.bookId);if(!title)fail(400,'عنوان الامتحان مطلوب');let query=db.from('question_bank').select('*').eq('active',true);if(value.category)query=query.eq('category',String(value.category));if(value.difficulty)query=query.eq('difficulty',String(value.difficulty));const bank=await query;if(bank.error)throw new Error(bank.error.message);const shuffled=(bank.data||[]).sort(()=>Math.random()-.5).slice(0,questionCount);if(shuffled.length<questionCount)fail(400,`لا يتوافر في المرشح سوى ${shuffled.length} سؤالًا`);const roadmapPosition=bookId?await nextRoadmapPosition(bookId):null,exam=await one<any>(db.from('exams').insert({title,book_id:bookId,roadmap_position:roadmapPosition,is_book_final:false,instructions:String(value.instructions||'اقرأ الأسئلة بعناية، وأجب عنها بنفسك وفق تعهّد الأمانة العلمية.'),starts_at:value.startsAt||null,ends_at:value.endsAt||null,duration_minutes:Math.max(1,Number(value.durationMinutes)||60),status:['draft','published','closed'].includes(value.status)?value.status:'draft',access_mode:value.accessMode==='public'?'public':'private'}).select('id').single());const rows=shuffled.map((q:any,index:number)=>({exam_id:exam.id,type:q.type,prompt:q.prompt,points,data_json:{...(q.data_json||{}),bank:{id:q.id,sourceKey:q.source_key,originalCode:q.original_code,category:q.category,topic:q.topic,difficulty:q.difficulty,sourceNote:q.source_note,bankSource:q.bank_source}},position:index+1})),inserted=await db.from('questions').insert(rows);if(inserted.error)throw new Error(inserted.error.message);return jsonResponse(request,{id:exam.id,questionCount:rows.length,totalPoints:rows.length*points,choice:rows.filter((q:any)=>q.type==='choice').length,truefalse:rows.filter((q:any)=>q.type==='truefalse').length},201);}
   fail(501,'هذا المسار موجود في خطة النقل ولم يُفعّل بعد في النسخة السحابية التجريبية');
 }
 

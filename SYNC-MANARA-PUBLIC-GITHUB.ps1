@@ -62,19 +62,23 @@ function Test-GitSuccess {
 function Update-ReleaseApk {
   New-Item -ItemType Directory -Path $releaseRoot -Force | Out-Null
   $candidateRoots = @(
+    $releaseRoot,
     [IO.Path]::GetFullPath((Join-Path $projectRoot '..\..\outputs')),
     (Join-Path $projectRoot 'outputs')
   ) | Select-Object -Unique
   $candidate = $candidateRoots |
     Where-Object { Test-Path -LiteralPath $_ } |
     ForEach-Object { Get-ChildItem -LiteralPath $_ -Filter 'Manara-App-*.apk' -File -ErrorAction SilentlyContinue } |
-    Sort-Object LastWriteTime -Descending |
+    Where-Object { $_.Name -match '^Manara-App-v\d+\.\d+\.\d+-.*\.apk$' } |
+    Sort-Object @{ Expression = { if ($_.Name -match '^Manara-App-v(\d+\.\d+\.\d+)-') { [version]$Matches[1] } }; Descending = $true }, @{ Expression = { $_.LastWriteTimeUtc }; Descending = $true } |
     Select-Object -First 1
   if ($candidate) {
+    $script:releaseApk = Join-Path $releaseRoot $candidate.Name
+    $script:releaseHash = "$releaseApk.sha256.txt"
     if (-not (Test-Path -LiteralPath $releaseApk) -or
         $candidate.LastWriteTimeUtc -gt (Get-Item -LiteralPath $releaseApk).LastWriteTimeUtc -or
         $candidate.Length -ne (Get-Item -LiteralPath $releaseApk).Length) {
-      Copy-Item -LiteralPath $candidate.FullName -Destination $releaseApk -Force
+      if ($candidate.FullName -ne $releaseApk) { Copy-Item -LiteralPath $candidate.FullName -Destination $releaseApk -Force }
       Write-PublishLog "Release APK refreshed from $($candidate.FullName)"
     }
   }

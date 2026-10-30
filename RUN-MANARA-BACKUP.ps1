@@ -1,4 +1,4 @@
-param([switch]$Force)
+param([switch]$Force, [switch]$SkipGitHubUpload)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = 'C:\Users\shraf\Documents\Codex\2026-09-29\i\work\manara-cloud'
@@ -142,7 +142,7 @@ try {
 
   $githubMarker = Join-Path $projectRoot '.tools\github-backup-publish\enabled'
   $githubPublisher = Join-Path $projectRoot 'PUBLISH-MANARA-ENCRYPTED-BACKUP.ps1'
-  if ((Test-Path -LiteralPath $githubMarker) -and (Test-Path -LiteralPath $githubPublisher)) {
+  if (-not $SkipGitHubUpload -and (Test-Path -LiteralPath $githubMarker) -and (Test-Path -LiteralPath $githubPublisher)) {
     Write-BackupLog 'Publishing the verified encrypted snapshot to the GitHub encrypted-backup branch.'
     $publisherProcess = Start-Process -FilePath 'powershell.exe' -ArgumentList @(
       '-NoProfile',

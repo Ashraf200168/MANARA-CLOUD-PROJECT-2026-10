@@ -35,6 +35,8 @@ analytics.settings
 **/obj/
 **/publish/
 **/.dart_tool/
+**/.tool-appdata/
+**/.tool-localappdata/
 **/.gradle/
 **/local.properties
 **/key.properties

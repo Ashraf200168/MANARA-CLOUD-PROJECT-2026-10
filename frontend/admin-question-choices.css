@@ -1,0 +1,14 @@
+.choice-answer-editor { min-width: 0; border: 0; padding: 0; margin: 0; }
+.choice-answer-editor legend { font-weight: 800; }
+.choice-answer-row {
+  padding: 14px;
+  margin-block: 12px;
+  border: 1px solid #9cc4d3;
+  border-radius: 14px;
+}
+.choice-answer-row.is-correct { border-color: #29805b; background: #eaf6ef; color: #123e59; }
+.choice-answer-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.choice-answer-row textarea { width: 100%; min-height: 64px; box-sizing: border-box; resize: vertical; }
+.choice-answer-row textarea[aria-invalid="true"] { border: 2px solid #b3261e; }
+.choice-answer-row .choice-correct-selector { display: flex; align-items: center; gap: 10px; margin-block-start: 12px; cursor: pointer; }
+.choice-correct-selector input[type="radio"] { width: 20px; height: 20px; flex: 0 0 20px; accent-color: #29805b; }

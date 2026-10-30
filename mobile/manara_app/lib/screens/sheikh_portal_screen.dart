@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import 'sheikh_book_roadmap_screen.dart';
 import 'sheikh_content_screens.dart';
 import 'sheikh_exams_screen.dart';
 import 'sheikh_students_screen.dart';
@@ -573,6 +574,17 @@ class _DashboardTab extends StatelessWidget {
                 onTap: () => _open(
                   context,
                   SheikhExamsScreen(api: api, adminToken: adminToken),
+                ),
+              ),
+              _AdminDestination(
+                icon: Icons.route_outlined,
+                label: 'مسارات الكتب',
+                onTap: () => _open(
+                  context,
+                  SheikhBookRoadmapsScreen(
+                    api: api,
+                    adminToken: adminToken,
+                  ),
                 ),
               ),
               _AdminDestination(

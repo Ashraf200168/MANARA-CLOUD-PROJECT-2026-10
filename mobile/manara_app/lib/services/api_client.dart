@@ -391,6 +391,23 @@ class ApiClient {
         await _request('/api/admin/books', bearerToken: adminToken) as List,
       );
 
+  Future<List<dynamic>> adminBookRoadmaps(String adminToken) async =>
+      List<dynamic>.from(
+        await _request('/api/admin/book-roadmaps', bearerToken: adminToken)
+            as List,
+      );
+
+  Future<Map<String, dynamic>> adminBookRoadmap(
+    String adminToken,
+    int bookId,
+  ) async => Map<String, dynamic>.from(
+    await _request(
+          '/api/admin/books/$bookId/roadmap',
+          bearerToken: adminToken,
+        )
+        as Map,
+  );
+
   Future<void> uploadBook({
     required String adminToken,
     required String title,

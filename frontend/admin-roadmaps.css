@@ -1,0 +1,12 @@
+.book-roadmap-progress {
+  width: 100%;
+  height: 12px;
+  accent-color: #2f8392;
+}
+.book-roadmap-results { overflow-x: auto; }
+.book-roadmap-results table { width: 100%; min-width: 420px; border-collapse: collapse; }
+.book-roadmap-results th, .book-roadmap-results td {
+  padding: 12px 8px;
+  text-align: start;
+  border-bottom: 1px solid #9cc4d3;
+}
