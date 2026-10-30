@@ -38,11 +38,12 @@ try {
 
   Write-Host '[1/3] Creating and verifying a fresh encrypted database and books backup...'
   $started = [DateTimeOffset]::Now
-  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'RUN-MANARA-BACKUP.ps1') -Force -SkipGitHubUpload
+  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $projectRoot 'RUN-MANARA-BACKUP.ps1') -Force -SkipGitHubUpload -WaitForLockSeconds 900
+  if ($LASTEXITCODE -eq 75) { throw 'Another backup is still running after 15 minutes. It was left untouched; try again after it finishes.' }
   if ($LASTEXITCODE -ne 0) { throw 'The fresh encrypted backup failed. Existing successful backups are still available.' }
   $last = Get-Content -LiteralPath (Join-Path $projectRoot '.tools\backup\last-success.json') -Raw | ConvertFrom-Json
   if ($last.status -ne 'SUCCESS' -or [DateTimeOffset]::Parse($last.completedAt) -lt $started) {
-    throw 'A new backup was not confirmed. Another backup may already be running; wait for it, then run this file again.'
+    throw 'The backup process ended without confirming a fresh verified backup. Nothing was uploaded.'
   }
   $backupHash = (Get-FileHash -LiteralPath $last.archive -Algorithm SHA256).Hash
   if ($backupHash -ne $last.sha256) { throw 'The verified backup checksum does not match.' }

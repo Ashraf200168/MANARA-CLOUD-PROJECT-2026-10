@@ -1,4 +1,8 @@
-param([switch]$Force, [switch]$SkipGitHubUpload)
+param(
+  [switch]$Force,
+  [switch]$SkipGitHubUpload,
+  [ValidateRange(0, 3600)][int]$WaitForLockSeconds = 0
+)
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = 'C:\Users\shraf\Documents\Codex\2026-09-29\i\work\manara-cloud'
@@ -39,8 +43,13 @@ function Remove-StagingPath([string]$Path) {
 }
 
 try {
-  $hasLock = $mutex.WaitOne(0)
-  if (-not $hasLock) { Write-Host 'Another Manara backup is already running.'; exit 0 }
+  . (Join-Path $PSScriptRoot 'scripts\BackupLockTools.ps1')
+  $hasLock = Wait-ManaraBackupLock -Mutex $mutex -TimeoutSeconds $WaitForLockSeconds
+  if (-not $hasLock) {
+    Write-Host 'Another Manara backup is still running. No backup was stopped or replaced.'
+    if ($WaitForLockSeconds -gt 0) { exit 75 }
+    exit 0
+  }
   New-Item -ItemType Directory -Path $toolRoot, $privateRoot, $stagingRoot -Force | Out-Null
   if (-not (Test-Path -LiteralPath $configPath)) { throw 'Backup is not configured. Run SETUP-MANARA-AUTOMATIC-BACKUP.cmd first.' }
   $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
