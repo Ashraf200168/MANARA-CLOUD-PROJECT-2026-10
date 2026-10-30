@@ -1,11 +1,14 @@
 [CmdletBinding()]
-param()
+param([switch]$Scheduled)
 $ErrorActionPreference = 'Stop'
 $projectRoot = $PSScriptRoot
 $statusRoot = Join-Path $projectRoot '.tools\github-update'
 $statusPath = Join-Path $statusRoot 'last-status.json'
 $mutex = New-Object Threading.Mutex($false, 'Local\ManaraReleaseBackupUpload')
 $hasLock = $false
+$reportToolsReady = $false
+$savedGitPrompt = $env:GIT_TERMINAL_PROMPT
+$savedGcmInteractive = $env:GCM_INTERACTIVE
 $state = [ordered]@{
   status = 'RUNNING'
   startedAt = [DateTimeOffset]::Now.ToString('o')
@@ -19,6 +22,27 @@ $state = [ordered]@{
 function Save-UploadState {
   $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statusPath -Encoding UTF8
 }
+function Save-TextReport {
+  $text = Format-ManaraBackupReport -State $state
+  $stamp = [DateTimeOffset]::Parse($state.startedAt).ToString('yyyyMMdd-HHmmss')
+  $roots = @((Join-Path $statusRoot 'reports'))
+  $configPath = Join-Path $projectRoot '.tools\backup\backup-config.json'
+  if (Test-Path -LiteralPath $configPath) {
+    try {
+      $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+      if ($config.backupRoot) { $roots += Join-Path ([string]$config.backupRoot) 'Reports' }
+    } catch { Write-Warning 'Could not read the backup folder for the second report copy.' }
+  }
+  foreach ($root in $roots) {
+    try {
+      New-Item -ItemType Directory -Force -Path $root | Out-Null
+      $report = Join-Path $root "manara-backup-report-$stamp.txt"
+      Set-Content -LiteralPath $report -Value $text -Encoding UTF8
+      Set-Content -LiteralPath (Join-Path $root 'latest-report.txt') -Value $text -Encoding UTF8
+      Write-Host "Text report: $report"
+    } catch { Write-Warning "Could not save a text report in $root" }
+  }
+}
 function Read-Git {
   param([string[]]$GitArgs)
   $output = @(& git -c "safe.directory=$projectRoot" -C $projectRoot @GitArgs)
@@ -26,8 +50,14 @@ function Read-Git {
   return ($output -join "`n").Trim()
 }
 try {
-  $hasLock = $mutex.WaitOne(0)
-  if (-not $hasLock) { throw 'A Manara backup/upload is already running.' }
+  try { $hasLock = $mutex.WaitOne(0) } catch [Threading.AbandonedMutexException] { $hasLock = $true }
+  if (-not $hasLock) { Write-Host 'A Manara backup/upload is already running. This duplicate run was skipped.'; exit 75 }
+  . (Join-Path $projectRoot 'scripts\BackupReportTools.ps1')
+  $reportToolsReady = $true
+  if ($Scheduled) {
+    $env:GIT_TERMINAL_PROMPT = '0'
+    $env:GCM_INTERACTIVE = 'Never'
+  }
   New-Item -ItemType Directory -Force -Path $statusRoot | Out-Null
   Save-UploadState
   $apk = Join-Path $projectRoot 'release\Manara-App-v1.5.1-question-editor-roadmap-arm64.apk'
@@ -83,10 +113,16 @@ try {
 } catch {
   $state.status = 'FAILED'
   $state.error = $_.Exception.Message
-  if (Test-Path -LiteralPath $statusRoot) { Save-UploadState }
+  $state.completedAt = [DateTimeOffset]::Now.ToString('o')
+  if ($hasLock -and (Test-Path -LiteralPath $statusRoot)) { Save-UploadState }
   Write-Host "BACKUP/UPLOAD FAILED: $($_.Exception.Message)" -ForegroundColor Red
   exit 1
 } finally {
-  if ($hasLock) { $mutex.ReleaseMutex() }
+  if ($hasLock) {
+    try { if ($reportToolsReady) { Save-TextReport } }
+    finally { $mutex.ReleaseMutex() }
+  }
   $mutex.Dispose()
+  $env:GIT_TERMINAL_PROMPT = $savedGitPrompt
+  $env:GCM_INTERACTIVE = $savedGcmInteractive
 }
