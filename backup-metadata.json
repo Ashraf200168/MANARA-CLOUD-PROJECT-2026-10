@@ -1,0 +1,9 @@
+﻿{
+    "format":  "manara-public-encrypted-backup-v1",
+    "sourceName":  "manara-cloud-20261031-100004.mnbak",
+    "createdAt":  "2026-10-31T07:05:38.1361725Z",
+    "publishedAt":  "2026-10-31T07:05:56.9620359+00:00",
+    "bytes":  15603271,
+    "sha256":  "3346BB454640FEA0DC2F672DBAE084BD43783C46069C436A63909CB15EF4DA6F",
+    "notice":  "Encrypted operational snapshot. The recovery passphrase is not stored in GitHub."
+}
