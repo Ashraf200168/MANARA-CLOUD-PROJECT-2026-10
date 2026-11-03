@@ -30,6 +30,12 @@ namespace Manara.Backup.Status
             using (var sha = SHA256.Create())
                 return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "");
         }
+        public static Icon AppIcon()
+        {
+            using(var stream=typeof(Data).Assembly.GetManifestResourceStream("Manara.Backup.Status.Icon"))
+            using(var icon=new Icon(stream,new Size(32,32)))
+                return (Icon)icon.Clone();
+        }
         public static string Digest(string text)
         {
             var match = Regex.Match(text ?? "", @"\A\s*([0-9a-fA-F]{64})(?=\s|$)");
@@ -128,6 +134,7 @@ namespace Manara.Backup.Status
         {
             try
             {
+                using(var icon=Data.AppIcon()) { if(icon.Width!=32 || icon.Height!=32)return 9; }
                 string hash = new string('A', 64);
                 if (Data.Digest(hash + "  manara-cloud-latest.mnbak") != hash || Data.Digest("bad") != "" || Data.Digest(hash + "0") != "") return 1;
                 var schedule = new Dictionary<string, object> { {"status","ACTIVE"}, {"firstRun","2026-10-31T10:00:00+03:00"}, {"daysInterval",3} };
@@ -190,6 +197,7 @@ namespace Manara.Backup.Status
 
         public StatusForm()
         {
+            Icon=Data.AppIcon();
             Text = "Manara — حالة النسخ الاحتياطي";
             Size = new Size(1080,850); MinimumSize = new Size(860,720);
             StartPosition = FormStartPosition.CenterScreen;
@@ -239,7 +247,7 @@ namespace Manara.Backup.Status
             layout.Controls.Add(report,0,9); Controls.Add(layout);
             Shown+=delegate { projectRoot=FindProject(); Reload(); };
             timer.Interval=30000; timer.Tick+=delegate { if (!busy && !expected.Focused && (grid.Focused || String.IsNullOrEmpty(selectedFile) || (backupRoot!=null && String.Equals(Path.GetDirectoryName(selectedFile),backupRoot,StringComparison.OrdinalIgnoreCase)))) Reload(); }; timer.Start();
-            FormClosed+=delegate { timer.Stop(); timer.Dispose(); };
+            FormClosed+=delegate { timer.Stop(); timer.Dispose(); if(Icon!=null)Icon.Dispose(); };
             FormClosing+=delegate(object sender,FormClosingEventArgs e){if(backupRunning){e.Cancel=true; MessageBox.Show(this,"النسخ والرفع يعمل الآن. اترك النافذة مفتوحة حتى ينتهي؛ يمكنك تصغيرها.","Manara");}};
         }
         void AddButton(FlowLayoutPanel panel, Button button, string text, EventHandler handler)

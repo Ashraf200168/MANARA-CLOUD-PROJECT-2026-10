@@ -2,6 +2,8 @@
 
 Open `release/Manara-Backup-Status.exe` on the Windows PC configured for Manara backups. It displays backup status and can start the existing backup/upload workflow on demand. It does not replace `Manara-Backup-Now.exe` or change the scheduled task.
 
+The EXE and application window use the original Manara image from `frontend/assets/reading-program-logo.jpg`, identical to the user-supplied `photo_2026-10-02_19-01-08.jpg`. The build generates an embedded, seven-resolution Windows icon from that exact image; no adjacent image/icon file is required when running the EXE.
+
 ## Back up now
 
 Click **نسخ احتياطي الآن**, then confirm. The program starts `BACKUP-AND-UPLOAD-MANARA.ps1 -Scheduled` under the Windows account running the viewer, without a separate console or pause. It shows live output while the existing workflow exports/encrypts/verifies data and books and uploads the encrypted snapshot plus sanitized source/documentation/APK to GitHub. The existing workflow saves the text reports.
